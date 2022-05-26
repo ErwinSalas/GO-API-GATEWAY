@@ -5,34 +5,33 @@ import (
 	"log"
 	"net/http"
 
+	inventorypb "github.com/ErwinSalas/inventory-service/proto"
 	"github.com/gorilla/mux"
-	"github.com/jinzhu/gorm"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/ErwinSalas/webui/models"
 	_ "github.com/jinzhu/gorm/dialects/mysql" //mysql database driver
 )
 
+const (
+	address = "inventory-service:8081"
+)
+
 type Server struct {
-	DB     *gorm.DB
-	Router *mux.Router
+	Router          *mux.Router
+	InventoryClient inventorypb.InventoryClient
 }
 
-func (server *Server) Initialize(Dbdriver, DbUser, DbPassword, DbPort, DbHost, DbName string) {
-
-	var err error
-
-	DBURL := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", DbUser, DbPassword, DbHost, DbPort, DbName)
-	server.DB, err = gorm.Open(Dbdriver, DBURL)
-	if err != nil {
-		fmt.Printf("Cannot connect to %s database", Dbdriver)
-		log.Fatal("This is the error:", err)
-	} else {
-		fmt.Printf("We are connected to the %s database", Dbdriver)
-	}
-
-	server.DB.Debug().AutoMigrate(&models.User{}, &models.Post{}) //database migration
+func (server *Server) Initialize() {
+	fmt.Println("Initialize")
 
 	server.Router = mux.NewRouter()
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("failed to connect: %v", err)
+	}
+	server.InventoryClient = inventorypb.NewInventoryClient(conn)
+	fmt.Println("initializeRoutes")
 
 	server.initializeRoutes()
 }
